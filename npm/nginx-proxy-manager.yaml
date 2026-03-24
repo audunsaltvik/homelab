@@ -1,0 +1,127 @@
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: proxy
+
+---
+# PVC for NPM data (config, certificates, logs)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: npm-data
+  namespace: proxy
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# PVC for Let's Encrypt certificates (separate for easy backup)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: npm-letsencrypt
+  namespace: proxy
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy-manager
+  namespace: proxy
+  labels:
+    app: nginx-proxy-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-proxy-manager
+  strategy:
+    type: Recreate          # Important: only one instance at a time (PVC)
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy-manager
+    spec:
+      containers:
+        - name: npm
+          image: jc21/nginx-proxy-manager:latest
+          ports:
+            - name: http
+              containerPort: 80
+              hostPort: 80        # NPM owns port 80 directly on the node
+            - name: admin
+              containerPort: 81
+              hostPort: 81        # Admin UI on port 81
+            - name: https
+              containerPort: 443
+              hostPort: 443       # NPM owns port 443 directly on the node
+          env:
+            - name: TZ
+              value: "Europe/Oslo"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: letsencrypt
+              mountPath: /etc/letsencrypt
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 81
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 81
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: npm-data
+        - name: letsencrypt
+          persistentVolumeClaim:
+            claimName: npm-letsencrypt
+
+---
+# Service — ClusterIP only, since hostPort above handles external access on 80/81/443
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-proxy-manager
+  namespace: proxy
+  labels:
+    app: nginx-proxy-manager
+spec:
+  type: ClusterIP
+  selector:
+    app: nginx-proxy-manager
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: https
+      port: 443
+      targetPort: 443
+    - name: admin
+      port: 81
+      targetPort: 81

@@ -1,0 +1,9 @@
+# Secrets — never commit these
+**/secrets/
+**/*secret*.yaml
+**/*credentials*.yaml
+# Backups — too large, not needed in git
+backups/
+.claude/
+commands.txt
+.claude/
