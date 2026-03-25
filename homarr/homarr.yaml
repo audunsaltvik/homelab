@@ -1,0 +1,111 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: homarr
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homarr-data
+  namespace: homarr
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homarr
+  namespace: homarr
+  labels:
+    app: homarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: homarr
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: homarr
+    spec:
+      containers:
+        - name: homarr
+          image: ghcr.io/homarr-labs/homarr:latest
+          ports:
+            - containerPort: 7575
+          env:
+            - name: TZ
+              value: "Europe/Oslo"
+            - name: AUTH_PROVIDER
+              value: "credentials"
+            - name: SECRET_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: homarr-secret
+                  key: SECRET_ENCRYPTION_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /app/data/configs
+              subPath: configs
+            - name: data
+              mountPath: /app/public/icons
+              subPath: icons
+            - name: data
+              mountPath: /data
+              subPath: data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 7575
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 7575
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: homarr-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homarr
+  namespace: homarr
+  labels:
+    app: homarr
+spec:
+  type: ClusterIP
+  selector:
+    app: homarr
+  ports:
+    - name: web
+      port: 7575
+      targetPort: 7575
+
+# Secret is managed outside of this manifest to avoid committing sensitive values.
+# Create it with:
+# kubectl create secret generic homarr-secret \
+#   --namespace homarr \
+#   --from-literal=SECRET_ENCRYPTION_KEY=$(openssl rand -hex 32)
