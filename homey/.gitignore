@@ -1,0 +1,13 @@
+# Backup files
+homey-backup-*.tar.gz
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Claude files
+.claude

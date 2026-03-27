@@ -1,0 +1,23 @@
+# Stop and backup
+kubectl scale deployment homey-shs -n home-automation --replicas=0
+PV_PATH=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="homey-shs-data")].spec.local.path}')
+sudo tar -czvf homey-migration.tar.gz -C ${PV_PATH} .
+
+# Copy to new server
+scp homey-migration.tar.gz newserver:/tmp/
+
+
+# On the new server
+
+# Apply the same manifests first
+kubectl apply -f homey-shs.yaml
+
+# Wait for PVC to be created, then scale down
+kubectl scale deployment homey-shs -n home-automation --replicas=0
+
+# Find PV path and restore
+PV_PATH=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="homey-shs-data")].spec.local.path}')
+sudo tar -xzvf /tmp/homey-migration.tar.gz -C ${PV_PATH}
+
+# Start Homey
+kubectl scale deployment homey-shs -n home-automation --replicas=1

@@ -1,0 +1,60 @@
+# homey-shs.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: home-automation
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homey-shs-data
+  namespace: home-automation
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path  # k3s default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homey-shs
+  namespace: home-automation
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Important: only one instance at a time
+  selector:
+    matchLabels:
+      app: homey-shs
+  template:
+    metadata:
+      labels:
+        app: homey-shs
+    spec:
+      hostNetwork: true  # Required for Homey device discovery
+      containers:
+        - name: homey-shs
+          image: ghcr.io/athombv/homey-shs:latest
+          securityContext:
+            privileged: true  # Required by Homey
+            capabilities:
+              add:
+                - NET_RAW
+                - NET_ADMIN
+          volumeMounts:
+            - name: homey-data
+              mountPath: /homey/user
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "1500m"
+      volumes:
+        - name: homey-data
+          persistentVolumeClaim:
+            claimName: homey-shs-data

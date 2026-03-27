@@ -1,0 +1,13 @@
+# Scale down Homey
+kubectl scale deployment homey-shs -n home-automation --replicas=0
+sleep 10
+
+# Find PV path
+PV_PATH=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="homey-shs-data")].spec.local.path}')
+
+# Restore from backup
+sudo rm -rf ${PV_PATH}/*
+sudo tar -xzvf /path/to/homey-backup-2026-01-05.tar.gz -C ${PV_PATH}
+
+# Start Homey
+kubectl scale deployment homey-shs -n home-automation --replicas=1

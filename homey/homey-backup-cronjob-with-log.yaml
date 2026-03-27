@@ -1,0 +1,64 @@
+# homey-backup-cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: homey-backup
+  namespace: home-automation
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          hostPID: true  # Required to access host's journald
+          containers:
+            - name: backup
+              image: alpine:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  apk add --no-cache tar gzip
+                  DATE=$(date +%Y-%m-%d)
+                  BACKUP_FILE="/backup/homey-backup-${DATE}.tar.gz"
+                  
+                  # Perform backup
+                  if tar -czvf "${BACKUP_FILE}" -C /homey-data . ; then
+                    BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
+                    echo "homey-backup: SUCCESS - Created ${BACKUP_FILE} (${BACKUP_SIZE})" > /dev/kmsg
+                    echo "Backup successful: ${BACKUP_FILE} (${BACKUP_SIZE})"
+                    
+                    # Keep only last 7 backups
+                    ls -t /backup/homey-backup-*.tar.gz | tail -n +8 | xargs -r rm
+                    
+                    exit 0
+                  else
+                    echo "homey-backup: ERROR - Backup failed!" > /dev/kmsg
+                    echo "Backup failed!"
+                    exit 1
+                  fi
+              securityContext:
+                privileged: true  # Required for /dev/kmsg access
+              volumeMounts:
+                - name: homey-data
+                  mountPath: /homey-data
+                  readOnly: true
+                - name: backup-storage
+                  mountPath: /backup
+                - name: kmsg
+                  mountPath: /dev/kmsg
+          restartPolicy: OnFailure
+          volumes:
+            - name: homey-data
+              persistentVolumeClaim:
+                claimName: homey-shs-data
+            - name: backup-storage
+              hostPath:
+                path: /var/backups/homey
+                type: DirectoryOrCreate
+            - name: kmsg
+              hostPath:
+                path: /dev/kmsg
+                type: CharDevice

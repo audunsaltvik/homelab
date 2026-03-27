@@ -1,0 +1,18 @@
+# Stop Homey
+kubectl scale deployment homey-shs -n home-automation --replicas=0
+
+# Start Homey
+kubectl scale deployment homey-shs -n home-automation --replicas=1
+
+# Trigger manual backup
+kubectl create job --from=cronjob/homey-backup manual-backup -n home-automation
+
+# Watch the backup job
+kubectl logs -n home-automation -l job-name=manual-backup -f
+
+# Check if backup has run
+journalctl --grep="homey-backup"
+
+# Update to new version if the deployment uses latest tag "image: ghcr.io/athombv/homey-shs:latest"
+kubectl rollout restart deployment homey-shs -n home-automation
+
