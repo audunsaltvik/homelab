@@ -102,7 +102,9 @@ Du skal se noe som:
 
 ## Konfigurasjon
 
-Du kan justere overvåkingsintervallet ved å endre `CHECK_INTERVAL` i `rbk-ticket-monitor.yaml`:
+Du kan justere innstillingene ved å endre environment variabler i `rbk-ticket-monitor.yaml`:
+
+### Overvåkingsintervall
 
 ```yaml
 - name: CHECK_INTERVAL
@@ -110,6 +112,15 @@ Du kan justere overvåkingsintervallet ved å endre `CHECK_INTERVAL` i `rbk-tick
 ```
 
 Anbefalt intervall er 5-10 minutter for å unngå å overbelaste nettsiden.
+
+### Kvinnekamper (Toppserien)
+
+```yaml
+- name: CHECK_WOMENS_MATCHES
+  value: "true"  # Sett til "false" for å skru av varsler for kvinnekamper
+```
+
+Hvis du kun vil ha varsler for herrenes kamper, sett denne til `"false"`. Som standard er varsler for kvinnekamper aktivert.
 
 ## Testing
 

@@ -18,6 +18,7 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '300'))  # Default: 5 minutes
 STATE_FILE = os.getenv('STATE_FILE', '/data/state.json')
+CHECK_WOMENS_MATCHES = os.getenv('CHECK_WOMENS_MATCHES', 'true').lower() in ('true', '1', 'yes')
 RBK_URL = 'https://billett.rbk.no/section/kampbilletter-76ym'
 
 # Configure logging
@@ -107,6 +108,12 @@ class TicketMonitor:
                     # Create unique ID from URL (more stable than title)
                     match_id = hashlib.md5(href.encode()).hexdigest()
 
+                    # Filter women's matches if disabled
+                    if not CHECK_WOMENS_MATCHES:
+                        if 'Toppserien' in title or 'Kvinner' in title or 'kvinner' in title:
+                            logger.debug(f"Skipping women's match: {title}")
+                            continue
+
                     if title and len(title) > 3:
                         matches[match_id] = {
                             'title': title,
@@ -187,6 +194,7 @@ class TicketMonitor:
         logger.info("Starting RBK Ticket Monitor")
         logger.info(f"Checking every {CHECK_INTERVAL} seconds")
         logger.info(f"Monitoring URL: {RBK_URL}")
+        logger.info(f"Women's matches (Toppserien): {'ENABLED' if CHECK_WOMENS_MATCHES else 'DISABLED'}")
 
         # Initial check
         try:

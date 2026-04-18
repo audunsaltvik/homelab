@@ -57,6 +57,8 @@ spec:
                   key: TELEGRAM_CHAT_ID
             - name: CHECK_INTERVAL
               value: "300"  # Check every 5 minutes
+            - name: CHECK_WOMENS_MATCHES
+              value: "false"  # Set to "false" to disable notifications for women's matches (Toppserien)
             - name: STATE_FILE
               value: "/data/state.json"
           volumeMounts:
