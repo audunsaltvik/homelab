@@ -61,6 +61,8 @@ spec:
               value: "false"  # Set to "false" to disable notifications for women's matches (Toppserien)
             - name: STATE_FILE
               value: "/data/state.json"
+            - name: UPTIME_KUMA_PUSH_URL
+              value: "http://kuma.home/api/push/<YOUR_PUSH_KEY>?status=up&msg=OK&ping="  # Set to your Uptime Kuma push URL, e.g. http://uptime-kuma.monitoring.svc.cluster.local:3001/api/push/<key>
           volumeMounts:
             - name: data
               mountPath: /data

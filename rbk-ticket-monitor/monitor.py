@@ -19,6 +19,7 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '300'))  # Default: 5 minutes
 STATE_FILE = os.getenv('STATE_FILE', '/data/state.json')
 CHECK_WOMENS_MATCHES = os.getenv('CHECK_WOMENS_MATCHES', 'true').lower() in ('true', '1', 'yes')
+UPTIME_KUMA_PUSH_URL = os.getenv('UPTIME_KUMA_PUSH_URL', '')
 RBK_URL = 'https://billett.rbk.no/section/kampbilletter-76ym'
 
 # Configure logging
@@ -164,12 +165,23 @@ class TicketMonitor:
         except Exception as e:
             logger.error(f"Error sending Telegram notification: {e}")
 
+    def ping_uptime_kuma(self, status: str = 'up', msg: str = 'OK'):
+        if not UPTIME_KUMA_PUSH_URL:
+            return
+        try:
+            # Strip any pre-filled query params from the URL, then add our own
+            base_url = UPTIME_KUMA_PUSH_URL.split('?')[0]
+            requests.get(base_url, params={'status': status, 'msg': msg, 'ping': ''}, timeout=10)
+        except Exception as e:
+            logger.warning(f"Uptime Kuma ping failed: {e}")
+
     def check_for_new_matches(self):
         """Check for new matches and send notifications."""
         matches = self.fetch_matches()
 
         if not matches:
             logger.warning("No matches found - page structure might have changed")
+            self.ping_uptime_kuma(status='down', msg='No matches found - page may have changed')
             return
 
         # Find new matches
@@ -188,6 +200,8 @@ class TicketMonitor:
             self.save_state()
         else:
             logger.info("No new matches found")
+
+        self.ping_uptime_kuma(status='up', msg=f"OK - {len(matches)} matches tracked")
 
     def run(self):
         """Main monitoring loop."""
