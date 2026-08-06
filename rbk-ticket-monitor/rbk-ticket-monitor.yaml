@@ -62,7 +62,10 @@ spec:
             - name: STATE_FILE
               value: "/data/state.json"
             - name: UPTIME_KUMA_PUSH_URL
-              value: "http://kuma.home/api/push/<YOUR_PUSH_KEY>?status=up&msg=OK&ping="  # Set to your Uptime Kuma push URL, e.g. http://uptime-kuma.monitoring.svc.cluster.local:3001/api/push/<key>
+              valueFrom:
+                secretKeyRef:
+                  name: rbk-monitor-secret
+                  key: UPTIME_KUMA_PUSH_URL
           volumeMounts:
             - name: data
               mountPath: /data
@@ -83,4 +86,5 @@ spec:
 # kubectl create secret generic rbk-monitor-secret \
 #   --namespace rbk-monitor \
 #   --from-literal=TELEGRAM_BOT_TOKEN=your_bot_token_here \
-#   --from-literal=TELEGRAM_CHAT_ID=your_chat_id_here
+#   --from-literal=TELEGRAM_CHAT_ID=your_chat_id_here \
+#   --from-literal=UPTIME_KUMA_PUSH_URL=http://uptime-kuma.monitoring.svc.cluster.local:3001/api/push/<your_push_key>?status=up&msg=OK&ping=
