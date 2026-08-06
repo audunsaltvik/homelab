@@ -1,0 +1,147 @@
+# Every value the templates read is declared here. Templates never apply a
+# `| default`, so anything missing from this file fails at render time rather
+# than silently deploying a value you never chose.
+
+image:
+  repository: localhost/nff-ticket-monitor
+  tag: latest
+  # Never: the image is side-loaded into k3s with `k3s ctr images import`,
+  # there is no registry to pull from.
+  pullPolicy: Never
+
+timezone: Europe/Oslo
+
+storage:
+  storageClassName: local-path
+  size: 256Mi
+  # Where the PVC is mounted, and therefore where the state files live.
+  mountPath: /data
+
+secret:
+  # Applied by hand from secrets-apply-manually/, not managed by this chart.
+  name: nff-monitor-secret
+  telegramTokenKey: TELEGRAM_BOT_TOKEN
+  telegramChatIdKey: TELEGRAM_CHAT_ID
+  uptimeKumaKey: UPTIME_KUMA_PUSH_URL
+
+http:
+  # Identifies the monitor honestly rather than pretending to be a person's
+  # browser, while still being a UA string the sites accept.
+  userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 nff-ticket-monitor/0.1 (personal ticket notifier)"
+  timeoutSeconds: 30
+  # Floor on the gap between two requests to the same host. Requests are never
+  # issued in parallel; this puts a ceiling on the sequential rate too.
+  minRequestIntervalSeconds: 2.0
+  maxRetries: 3
+  backoffBaseSeconds: 5
+  backoffMaxSeconds: 120
+
+# --- Watcher A: announcements ------------------------------------------------
+announce:
+  # www.fotball.no robots.txt is `User-agent: * / Disallow: /`. Setting this to
+  # true is a deliberate decision to poll it anyway; every such fetch is logged
+  # with a ROBOTS-DISALLOWED line. Set to false to stop touching that host - at
+  # the cost of losing sale dates entirely, and with them the hot window.
+  enabled: true
+  # Only fixtures played in Norway ("NORGE - X"). Away tickets are sold by the
+  # opposing federation, so their sale dates cannot drive our hot window.
+  homeMatchesOnly: true
+  schedule: "7 * * * *"
+  startingDeadlineSeconds: 300
+  activeDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+# --- Watcher B: availability -------------------------------------------------
+availability:
+  # Fires every 5 minutes; the process itself decides whether to poll. Outside
+  # a sale window most runs exit in under a second.
+  schedule: "*/5 * * * *"
+  startingDeadlineSeconds: 120
+  # Slightly under the 5-minute cron period so a long hot-window run finishes
+  # before the next one is due, which concurrencyPolicy: Forbid would skip.
+  activeDeadlineSeconds: 280
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+
+  # Cadence for billett.fotball.no outside any sale window. Primary onsales
+  # happen at times we know in advance, so polling between them is cheap
+  # insurance rather than a race.
+  normalIntervalSeconds: 1800
+  # Cadence for resale.fotball.no: effectively every cron run, i.e. every 5
+  # minutes. A supporter can list a ticket at any moment and it is often bought
+  # within minutes, so a longer gap misses most of them. Costs one request per
+  # watched match per cycle, since performanceIds are read from state instead of
+  # re-walking the catalogue.
+  #
+  # Deliberately 240 and not 300: the gate compares against the *previous* run's
+  # start time, and consecutive cron runs are 300s apart give or take pod
+  # scheduling jitter. At exactly 300 a run that starts a moment early fails the
+  # gate and defers to the next one, silently turning the cadence into 10
+  # minutes half the time. 240 leaves margin so every run passes.
+  resaleIntervalSeconds: 240
+  # Cadence inside a sale window.
+  hotIntervalSeconds: 60
+  # Must exceed the cron period (300s), otherwise the first run that notices a
+  # window can land exactly at sale time instead of comfortably before it.
+  hotWindowBeforeSeconds: 600
+  hotWindowAfterSeconds: 3600
+  # Upper bound on the internal hot-window loop, kept under activeDeadlineSeconds.
+  maxRunSeconds: 240
+
+  # At most one notification per match per source per this many seconds.
+  # Bursty resale listings are accumulated and sent as a single message.
+  notifyCooldownSeconds: 600
+  # A broken parser alerts at most this often, so a persistent markup change
+  # does not turn into a message every five minutes.
+  parseFailureAlertCooldownSeconds: 21600
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+# --- What to watch -----------------------------------------------------------
+# A productId is a *category* (e.g. all Nations League men's home matches), not
+# a single match. New fixtures appear underneath an existing product, so
+# watching the product picks them up without editing this file.
+#
+# Find ids with:  ./run-local.sh list-products
+#
+#   productId       required, from list-products
+#   label           what shows up in the Telegram message
+#   include         fnmatch patterns against "Home vs Away"; empty = all
+#   exclude         fnmatch patterns to drop
+#   sources         primary (billett.fotball.no) and/or resale (resale.fotball.no)
+#   performanceIds  optional pin to specific matches; empty = all under product
+watch:
+  - productId: 10229739619905
+    label: "Nations League - A-herrer"
+    # Home matches only: away fixtures are sold by the opposing federation.
+    include:
+      - "Norge vs *"
+    exclude: []
+    sources:
+      - primary
+      - resale
+    performanceIds: []
+
+  - productId: 10229719360412
+    label: "Privatlandskamper - A-herrer"
+    include:
+      - "Norge vs *"
+    exclude: []
+    sources:
+      - primary
+      - resale
+    performanceIds: []

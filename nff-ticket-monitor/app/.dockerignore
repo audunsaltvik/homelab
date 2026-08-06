@@ -1,0 +1,5 @@
+.venv/
+local-state/
+.env.local
+__pycache__/
+*.pyc

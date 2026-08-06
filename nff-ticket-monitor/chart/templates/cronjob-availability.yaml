@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "nff-ticket-monitor.name" . }}-availability
+  labels:
+    {{- include "nff-ticket-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: availability
+spec:
+  schedule: {{ .Values.availability.schedule | quote }}
+  timeZone: {{ .Values.timezone | quote }}
+  # Essential rather than merely tidy: during a sale window a run keeps polling
+  # internally for several minutes, so the next scheduled run must be skipped
+  # instead of starting a second poller against the same state file.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.availability.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.availability.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.availability.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: {{ .Values.availability.activeDeadlineSeconds }}
+      # No in-place retry: the next run is at most five minutes away, and the
+      # app already backs off internally on transient errors.
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            {{- include "nff-ticket-monitor.labels" . | nindent 12 }}
+            app.kubernetes.io/component: availability
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+            - name: availability
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: ["availability"]
+              env:
+                {{- include "nff-ticket-monitor.env" . | nindent 16 }}
+              volumeMounts:
+                - name: data
+                  mountPath: {{ .Values.storage.mountPath }}
+              resources:
+                requests:
+                  cpu: {{ .Values.availability.resources.requests.cpu }}
+                  memory: {{ .Values.availability.resources.requests.memory }}
+                limits:
+                  cpu: {{ .Values.availability.resources.limits.cpu }}
+                  memory: {{ .Values.availability.resources.limits.memory }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ include "nff-ticket-monitor.name" . }}-data

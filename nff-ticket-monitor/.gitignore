@@ -1,0 +1,7 @@
+# Real secret, as opposed to the committed .example
+secrets-apply-manually/nff-monitor-secret.yaml
+app/.env.local
+app/.venv/
+app/local-state/
+__pycache__/
+*.pyc

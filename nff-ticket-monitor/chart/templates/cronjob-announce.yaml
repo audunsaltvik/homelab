@@ -1,0 +1,63 @@
+{{- if .Values.announce.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "nff-ticket-monitor.name" . }}-announce
+  labels:
+    {{- include "nff-ticket-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: announce
+spec:
+  schedule: {{ .Values.announce.schedule | quote }}
+  timeZone: {{ .Values.timezone | quote }}
+  # Two runs writing announcements.json at once would race; there is also
+  # nothing to gain from overlapping an hourly poll.
+  concurrencyPolicy: Forbid
+  # Without this, a node that was down long enough will fire every missed run
+  # at once the moment it comes back.
+  startingDeadlineSeconds: {{ .Values.announce.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.announce.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.announce.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: {{ .Values.announce.activeDeadlineSeconds }}
+      # A failed poll is retried by the next scheduled run, an hour later.
+      # Retrying in-place would hammer a site that is already unhappy.
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            {{- include "nff-ticket-monitor.labels" . | nindent 12 }}
+            app.kubernetes.io/component: announce
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+            - name: announce
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: ["announce"]
+              env:
+                {{- include "nff-ticket-monitor.env" . | nindent 16 }}
+              volumeMounts:
+                - name: data
+                  mountPath: {{ .Values.storage.mountPath }}
+              resources:
+                requests:
+                  cpu: {{ .Values.announce.resources.requests.cpu }}
+                  memory: {{ .Values.announce.resources.requests.memory }}
+                limits:
+                  cpu: {{ .Values.announce.resources.limits.cpu }}
+                  memory: {{ .Values.announce.resources.limits.memory }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ include "nff-ticket-monitor.name" . }}-data
+{{- end }}

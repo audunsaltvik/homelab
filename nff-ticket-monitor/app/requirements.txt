@@ -1,0 +1,6 @@
+# Pinned to versions that ship wheels for both the container's Python 3.12 and
+# a current Fedora's 3.14, so `run-local.sh` does not need libxml2 headers to
+# build lxml from source.
+requests==2.34.2
+beautifulsoup4==4.15.0
+lxml==6.1.1

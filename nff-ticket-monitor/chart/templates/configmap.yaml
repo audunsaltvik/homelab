@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nff-ticket-monitor.name" . }}-config
+  labels:
+    {{- include "nff-ticket-monitor.labels" . | nindent 4 }}
+data:
+  USER_AGENT: {{ .Values.http.userAgent | quote }}
+  REQUEST_TIMEOUT_SECONDS: {{ .Values.http.timeoutSeconds | quote }}
+  MIN_REQUEST_INTERVAL_SECONDS: {{ .Values.http.minRequestIntervalSeconds | quote }}
+  MAX_RETRIES: {{ .Values.http.maxRetries | quote }}
+  BACKOFF_BASE_SECONDS: {{ .Values.http.backoffBaseSeconds | quote }}
+  BACKOFF_MAX_SECONDS: {{ .Values.http.backoffMaxSeconds | quote }}
+
+  ANNOUNCE_ENABLED: {{ .Values.announce.enabled | quote }}
+  ANNOUNCE_HOME_ONLY: {{ .Values.announce.homeMatchesOnly | quote }}
+
+  NORMAL_INTERVAL_SECONDS: {{ .Values.availability.normalIntervalSeconds | quote }}
+  RESALE_INTERVAL_SECONDS: {{ .Values.availability.resaleIntervalSeconds | quote }}
+  HOT_INTERVAL_SECONDS: {{ .Values.availability.hotIntervalSeconds | quote }}
+  HOT_WINDOW_BEFORE_SECONDS: {{ .Values.availability.hotWindowBeforeSeconds | quote }}
+  HOT_WINDOW_AFTER_SECONDS: {{ .Values.availability.hotWindowAfterSeconds | quote }}
+  MAX_RUN_SECONDS: {{ .Values.availability.maxRunSeconds | quote }}
+  NOTIFY_COOLDOWN_SECONDS: {{ .Values.availability.notifyCooldownSeconds | quote }}
+  PARSE_FAILURE_ALERT_COOLDOWN_SECONDS: {{ .Values.availability.parseFailureAlertCooldownSeconds | quote }}
+
+  # The watch list is handed to the app as JSON so adding a match stays a
+  # values.yaml edit and never a code change.
+  WATCH_JSON: |-
+    {{ .Values.watch | toJson }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nff-ticket-monitor
+description: Ticket availability notifier for Norway men's national team matches (billett.fotball.no + resale.fotball.no)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
