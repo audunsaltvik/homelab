@@ -2,6 +2,9 @@
 **/secrets/
 **/*secret*.yaml
 **/*credentials*.yaml
+# ...but *.example.yaml holds placeholders only, and is the documentation that
+# tells you which keys the real secret needs. Must stay in the repo.
+!**/*.example.yaml
 # Backups — too large, not needed in git
 backups/
 .claude/
